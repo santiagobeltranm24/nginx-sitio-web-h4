@@ -1,147 +1,113 @@
-# Administración, respaldo y migración de un servidor Docker con Nginx
+# Nginx con Docker — Hito 4
 
-Proyecto académico de **Sistemas Operativos — Hito 4**. El trabajo aborda la administración de un servidor web Nginx ejecutado en un contenedor Docker sobre Alpine Linux, incluyendo revisión del entorno, respaldo de información, exportación de una imagen y preparación para su migración a otro sistema Linux.
+Proyecto académico de **Sistemas Operativos — Hito 4**. Este repositorio contiene el respaldo de archivos de configuración y del sitio web de Nginx utilizado en la práctica de administración, respaldo y migración de un servidor Docker sobre Alpine Linux.
 
-> **Importante:** los nombres de contenedores, etiquetas de imágenes, puertos y rutas dependen de la instalación utilizada durante la práctica. Los comandos de esta guía usan valores de ejemplo o variables; reemplázalos por los datos reales de tu entorno antes de ejecutarlos.
+## Contenido del repositorio
+
+```text
+nginx-sitio-web-h4/
+├── README.md
+└── backup/
+    ├── conf.d/
+    │   └── default.conf
+    └── html/
+        ├── 50x.html
+        └── index.html
+```
+
+### Archivos respaldados
+
+- `backup/conf.d/default.conf`: configuración del bloque `server` de Nginx. Escucha en el puerto 80, utiliza `/usr/share/nginx/html` como raíz del sitio y define la página de error `50x.html` para los errores 500, 502, 503 y 504.
+- `backup/html/index.html`: página principal personalizada en español. Presenta la práctica del Hito 4 y menciona Alpine Linux, Docker y Nginx.
+- `backup/html/50x.html`: página de error de Nginx incluida en el respaldo.
 
 ## Objetivo
 
-Documentar un procedimiento reproducible para inspeccionar el servicio Nginx, respaldar sus archivos y conservar la imagen Docker necesaria para trasladar el servicio a otro equipo Linux.
+Conservar los archivos relevantes del sitio web y su configuración para facilitar su revisión, respaldo y restauración en otro entorno Linux.
 
 ## Tecnologías y herramientas
 
-- **Alpine Linux:** sistema operativo del entorno de trabajo.
+- **Alpine Linux:** entorno Linux utilizado en la práctica.
 - **Docker:** administración de contenedores e imágenes.
-- **Nginx:** servidor web.
+- **Nginx:** servidor web que publica el contenido estático.
 - **WinSCP:** transferencia de archivos entre equipos.
-- **GitHub:** almacenamiento de la documentación del proyecto.
+- **GitHub:** control de versiones y documentación del respaldo.
 
-## Alcance de la práctica
+## Inspección del contenedor
 
-1. Inspeccionar los contenedores y las imágenes disponibles.
-2. Revisar el estado del contenedor, la configuración, los puertos publicados, los registros y el consumo de recursos.
-3. Evaluar límites de recursos a nivel de Docker sin modificar los recursos asignados a la máquina virtual.
-4. Copiar los archivos del sitio web desde el contenedor hacia el sistema Alpine para conservar un respaldo.
-5. Construir y exportar una imagen Docker personalizada.
-6. Explicar el traslado de los respaldos y la imagen a otro equipo Linux.
-7. Documentar la transferencia de archivos mediante WinSCP.
-
-## Comandos de inspección
-
-Consultar los contenedores activos y todos los contenedores:
+Los siguientes comandos permiten revisar el estado del entorno. Sustituye `CONTENEDOR` por el nombre o ID real:
 
 ```bash
-docker ps
 docker ps -a
-```
-
-Consultar las imágenes disponibles:
-
-```bash
 docker images
+docker inspect CONTENEDOR
+docker logs CONTENEDOR
+docker stats CONTENEDOR
+docker port CONTENEDOR
 ```
 
-Inspeccionar un contenedor:
+## Respaldo de archivos desde el contenedor
+
+En la configuración incluida, Nginx sirve el sitio desde `/usr/share/nginx/html` y carga la configuración del servidor desde `/etc/nginx/conf.d/default.conf`. Si esas rutas coinciden con el contenedor utilizado, los archivos se pueden copiar con:
 
 ```bash
-docker inspect <nombre_o_id_del_contenedor>
-docker logs <nombre_o_id_del_contenedor>
-docker stats <nombre_o_id_del_contenedor>
+mkdir -p backup/html backup/conf.d
+docker cp CONTENEDOR:/usr/share/nginx/html/. ./backup/html/
+docker cp CONTENEDOR:/etc/nginx/conf.d/default.conf ./backup/conf.d/default.conf
 ```
 
-Revisar los puertos publicados:
+Verifica el contenido copiado:
 
 ```bash
-docker port <nombre_o_id_del_contenedor>
+find backup -type f -maxdepth 3
 ```
 
-## Respaldo de los archivos del sitio
+## Exportación y restauración de una imagen Docker
 
-Crear un directorio de respaldo en Alpine Linux:
+Para guardar una imagen existente, primero identifica su nombre y etiqueta con `docker images`. Después:
 
 ```bash
-mkdir -p ~/H4_Apellido_Nombre/respaldo-sitio
+docker save -o nginx-h4.tar NOMBRE_IMAGEN:ETIQUETA
 ```
 
-Copiar los archivos desde el contenedor al sistema anfitrión. Sustituir la ruta de origen por la ubicación real de los archivos de Nginx dentro del contenedor:
-
-```bash
-docker cp <contenedor>:/ruta/real/del/sitio ~/H4_Apellido_Nombre/respaldo-sitio/
-```
-
-Comprobar que los archivos se hayan copiado:
-
-```bash
-ls -lah ~/H4_Apellido_Nombre/respaldo-sitio/
-```
-
-## Construcción y exportación de la imagen
-
-Desde el directorio que contiene el Dockerfile, construir una imagen personalizada:
-
-```bash
-docker build -t nginx-h4:1.0 .
-```
-
-Comprobar que la imagen exista:
-
-```bash
-docker images
-```
-
-Exportar la imagen a un archivo TAR:
-
-```bash
-docker save -o ~/H4_Apellido_Nombre/nginx-h4.tar nginx-h4:1.0
-```
-
-El archivo generado contiene la imagen Docker. No sustituye el respaldo de archivos o volúmenes que puedan contener datos persistentes.
-
-## Migración a otro equipo Linux
-
-1. Transferir el directorio de respaldo y el archivo TAR al equipo de destino, por ejemplo, mediante WinSCP.
-2. Verificar que Docker esté instalado y funcionando en el equipo de destino.
-3. Importar la imagen:
+En el equipo Linux de destino, después de transferir el archivo TAR:
 
 ```bash
 docker load -i nginx-h4.tar
-```
-
-4. Comprobar que la imagen se haya importado:
-
-```bash
 docker images
 ```
 
-5. Restaurar o montar los archivos del sitio según la configuración original y crear el contenedor con los puertos y parámetros que correspondan al entorno de destino.
-6. Verificar el funcionamiento del servicio mediante el navegador y revisar los registros del contenedor.
+El archivo TAR de la imagen no incluye automáticamente los datos que estén guardados en volúmenes ni reemplaza el respaldo de los archivos del sitio. Conserva y transfiere ambos por separado cuando corresponda.
 
-La imagen conserva el entorno empaquetado, pero la configuración de ejecución —por ejemplo, puertos, volúmenes y variables— debe reproducirse al crear el nuevo contenedor.
+## Restauración del sitio
+
+Los archivos respaldados pueden utilizarse al crear un nuevo contenedor, montándolos en las rutas que utiliza Nginx. Ejemplo orientativo:
+
+```bash
+docker run -d --name nginx-restaurado \
+  -p 8080:80 \
+  -v "$(pwd)/backup/html:/usr/share/nginx/html:ro" \
+  -v "$(pwd)/backup/conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro" \
+  NOMBRE_IMAGEN:ETIQUETA
+```
+
+Adapta el nombre de la imagen y el puerto a tu entorno. Si modificas la configuración, valida que Nginx pueda iniciarse correctamente y revisa los registros:
+
+```bash
+docker logs nginx-restaurado
+```
 
 ## Transferencia con WinSCP
 
-Utilizar WinSCP para conectarse al equipo Alpine mediante el protocolo habilitado en el entorno (por ejemplo, SFTP). Transferir la carpeta de trabajo `H4_Apellido_Nombre` al equipo local y comprobar que incluya los respaldos y archivos solicitados para la entrega.
+Transfiere la carpeta del proyecto al equipo local mediante el protocolo habilitado en el entorno (por ejemplo, SFTP). Comprueba que `backup/` incluya la configuración y los archivos HTML necesarios.
 
-## Organización sugerida de la entrega
+## Notas
 
-```text
-H4_Apellido_Nombre/
-├── respaldo-sitio/
-├── nginx-h4.tar
-├── evidencias/
-└── informe/
-```
-
-La estructura es orientativa: conservar los nombres y archivos exigidos por la consigna de la asignatura.
-
-## Consideraciones
-
-- Los comandos con valores entre `< >` son plantillas y deben adaptarse a los nombres y rutas reales.
-- No se deben publicar contraseñas, claves privadas, tokens ni datos sensibles.
-- Los respaldos y las imágenes Docker pueden ocupar bastante espacio; GitHub se utiliza aquí para documentar el trabajo, no como sustituto del almacenamiento de respaldos.
-- Antes de dar por válida una migración, comprobar que el sitio web responda correctamente en el equipo de destino.
+- Los comandos son ejemplos de referencia; ejecútalos solo después de confirmar nombres, rutas, etiquetas y puertos reales.
+- Este repositorio contiene los archivos del respaldo y su documentación. No contiene una imagen Docker exportada ni un Dockerfile en la estructura actual.
+- GitHub sirve para versionar los archivos de texto y la documentación; no sustituye el respaldo externo de imágenes, volúmenes o evidencias que solicite la actividad.
+- No subas contraseñas, tokens, claves privadas ni otros datos sensibles.
 
 ## Autoría
 
 Trabajo académico realizado para la asignatura de **Sistemas Operativos**.
-
